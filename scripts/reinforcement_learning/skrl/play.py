@@ -39,6 +39,12 @@ parser.add_argument(
     ),
 )
 parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint.")
+parser.add_argument(
+    "--load_run",
+    type=str,
+    default=None,
+    help="The name of the run to load the checkpoint from.",
+)
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument(
     "--use_pretrained_checkpoint",
@@ -160,9 +166,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, expe
     elif args_cli.checkpoint:
         resume_path = os.path.abspath(args_cli.checkpoint)
     else:
-        resume_path = get_checkpoint_path(
-            log_root_path, run_dir=f".*_{algorithm}_{args_cli.ml_framework}", other_dirs=["checkpoints"]
-        )
+        if args_cli.load_run is not None:
+            resume_path = get_checkpoint_path(
+                log_root_path, run_dir=f".*_{algorithm}_{args_cli.ml_framework}", other_dirs=["checkpoints"], load_run=args_cli.load_run
+            )
+        else:
+            resume_path = get_checkpoint_path(
+                log_root_path, run_dir=f".*_{algorithm}_{args_cli.ml_framework}", other_dirs=["checkpoints"]
+            )
     log_dir = os.path.dirname(os.path.dirname(resume_path))
 
     # set the log directory for the environment (works for all environment types)

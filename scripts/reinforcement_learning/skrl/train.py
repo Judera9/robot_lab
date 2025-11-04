@@ -80,7 +80,7 @@ import os
 import random
 from datetime import datetime
 
-import omni
+import omni  # type: ignore
 import skrl
 from packaging import version
 
@@ -108,10 +108,10 @@ from isaaclab.envs import (
 from isaaclab.utils.assets import retrieve_file_path
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.io import dump_yaml
-from isaaclab_rl.skrl import SkrlVecEnvWrapper
+from skrl.envs.wrappers.torch.isaaclab_rl_skrl import SkrlVecEnvWrapper
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
-import robot_lab  # noqa: F401
+import robot_lab  # noqa: F401 # type: ignore
 
 # config shortcuts
 if args_cli.agent is None:

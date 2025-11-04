@@ -543,6 +543,16 @@ class RewardsCfg:
         },
     )
 
+    feet_air_time_positive_biped = RewTerm(
+        func=mdp.feet_air_time_positive_biped,
+        weight=0.0,
+        params={
+            "command_name": "base_velocity",
+            "threshold": 0.4,
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=""),
+        },
+    )
+
     feet_air_time_variance = RewTerm(
         func=mdp.feet_air_time_variance_penalty,
         weight=0,
@@ -664,7 +674,14 @@ class TerminationsCfg:
         func=mdp.illegal_contact,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=""), "threshold": 1.0},
     )
-
+    bad_orientation = DoneTerm(
+        func=mdp.bad_orientation,
+        params={"limit_angle": 1.2},
+    )
+    root_height_below_minimum = DoneTerm(
+        func=mdp.root_height_below_minimum,
+        params={"minimum_height": 0.2},
+    )
 
 @configclass
 class CurriculumCfg:

@@ -37,3 +37,6 @@ _build
 
 # LSP
 pyrightconfig.json
+
+# custome
+**/jax/
