@@ -40,3 +40,6 @@ pyrightconfig.json
 
 # custome
 **/jax/
+*.npy
+# source/robot_lab/data/Dataset/*
+# !source/robot_lab/data/Dataset/**/*.ipynb
