@@ -55,7 +55,7 @@ parser.add_argument(
     "--ml_framework",
     type=str,
     default="torch",
-    choices=["torch", "jax", "jax-numpy"],
+    choices=["torch"],
     help="The ML framework used for training the skrl agent.",
 )
 parser.add_argument(
@@ -102,10 +102,7 @@ if version.parse(skrl.__version__) < version.parse(SKRL_VERSION):
     )
     exit()
 
-if args_cli.ml_framework.startswith("torch"):
-    from skrl.utils.runner.torch import Runner
-elif args_cli.ml_framework.startswith("jax"):
-    from skrl.utils.runner.jax import Runner
+from skrl.utils.runner import Runner
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -116,7 +113,7 @@ from isaaclab.envs import (
 )
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
-from isaaclab_rl.skrl import SkrlVecEnvWrapper
+from skrl.envs.wrappers.isaaclab_rl_skrl import SkrlVecEnvWrapper
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
@@ -137,10 +134,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, expe
     # override configurations with non-hydra CLI arguments
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
-
-    # configure the ML framework into the global skrl variable
-    if args_cli.ml_framework.startswith("jax"):
-        skrl.config.jax.backend = "jax" if args_cli.ml_framework == "jax" else "numpy"
 
     # randomly sample a seed if seed = -1
     if args_cli.seed == -1:
