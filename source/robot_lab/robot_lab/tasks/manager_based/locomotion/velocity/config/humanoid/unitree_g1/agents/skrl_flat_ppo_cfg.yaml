@@ -22,6 +22,9 @@ models:
     min_log_std: -20.0
     max_action: 100.0
     min_action: -100.0
+    noise_generator: PinkNoiseDist
+    noise_generator_kwargs: 
+      smoothing: 0.6
   value:  # see deterministic_model parameters
     class: SimpleDeterministic
     critic_hidden_dims: [512, 256, 128]
