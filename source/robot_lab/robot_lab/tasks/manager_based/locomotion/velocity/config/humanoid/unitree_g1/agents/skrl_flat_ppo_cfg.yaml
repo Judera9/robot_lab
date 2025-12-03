@@ -69,7 +69,8 @@ agent:
   entropy_scheduler_kwargs:
     decay_factor: 0.99
     decay_interval: 1000
-  grad_penalty_weight: 0.0001
+    min_value: 0.003
+  grad_penalty_weight: 0.0
   value_loss_scale: 1.0
   kl_threshold: 0.1
   rewards_shaper_scale: 1.0
