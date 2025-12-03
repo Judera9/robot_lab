@@ -11,27 +11,21 @@ seed: 42
 models:
   separate: True
   policy:  # see gaussian_model parameters
-    class: GaussianMixin
-    clip_actions: False
-    clip_log_std: True
-    min_log_std: -20.0
+    class: SimpleGaussian
+    init_noise_std: 1.0
+    actor_hidden_dims: [512, 256, 128]
+    activation: elu
+    noise_std_type: "log"
+    share_std_backbone: False
+    output_action_scale: False
     max_log_std: 2.0
-    initial_log_std: 0.0  # -2.9
-    network:
-      - name: net
-        input: OBSERVATIONS
-        layers: [512, 256, 128]  # [512, 256, 128]
-        activations: relu
-    output: ACTIONS
+    min_log_std: -20.0
+    max_action: 100.0
+    min_action: -100.0
   value:  # see deterministic_model parameters
-    class: DeterministicMixin
-    clip_actions: False
-    network:
-      - name: net
-        input: OBSERVATIONS
-        layers: [512, 256, 128]  # [512, 256, 128]
-        activations: relu
-    output: ONE
+    class: SimpleDeterministic
+    critic_hidden_dims: [512, 256, 128]
+    activation: elu
 
 
 # Rollout memory
@@ -44,7 +38,7 @@ memory:
 # PPO agent configuration (field names are from PPO_DEFAULT_CONFIG)
 # https://skrl.readthedocs.io/en/latest/api/agents/ppo.html
 agent:
-  class: PPO
+  class: POMDP_PPO
   rollouts: 24
   learning_epochs: 5
   mini_batches: 4
@@ -53,14 +47,16 @@ agent:
   learning_rate: 1.0e-03
   learning_rate_scheduler: KLAdaptiveLR
   learning_rate_scheduler_kwargs:
-    kl_threshold: 0.02
+    kl_threshold: 0.01
     min_lr: 1.0e-05
     max_lr: 1.0e-02
     kl_factor: 2.0
     lr_factor: 1.5
-  state_preprocessor: null
+  state_preprocessor: RunningStandardScaler
   state_preprocessor_kwargs: null
-  value_preprocessor: null
+  actor_observation_preprocessor: RunningStandardScaler
+  actor_observation_preprocessor_kwargs: null
+  value_preprocessor: RunningStandardScaler
   value_preprocessor_kwargs: null
   random_timesteps: 0
   learning_starts: 0
@@ -68,11 +64,16 @@ agent:
   ratio_clip: 0.2
   value_clip: 0.2
   clip_predicted_values: True
-  entropy_loss_scale: 0.02
+  entropy_loss_scale: 0.005
+  entropy_scheduler: ConstantScheduler
+  entropy_scheduler_kwargs:
+    decay_factor: 0.99
+    decay_interval: 1000
+  grad_penalty_weight: 0.0001
   value_loss_scale: 1.0
-  kl_threshold: 0.0
+  kl_threshold: 0.1
   rewards_shaper_scale: 1.0
-  time_limit_bootstrap: False
+  time_limit_bootstrap: True
   # logging and checkpoint
   experiment:
     directory: "g1_flat"
@@ -84,6 +85,6 @@ agent:
 # Sequential trainer
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html
 trainer:
-  class: SequentialTrainer
-  timesteps: 36000
+  class: IsaaclabTrainer
+  timesteps: 240000
   environment_info: log
