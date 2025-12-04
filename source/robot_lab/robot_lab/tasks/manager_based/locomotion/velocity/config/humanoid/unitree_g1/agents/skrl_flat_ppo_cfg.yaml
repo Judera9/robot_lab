@@ -27,7 +27,8 @@ models:
       smoothing: 0.5
       add_scale: 0.0  # 0.0 no scheduler
       decay_interval: 2400  # timesteps * 24 (rollouts)
-      max_value: 0.6
+      max_value: 1.0
+
   value:  # see deterministic_model parameters
     class: SimpleDeterministic
     critic_hidden_dims: [512, 256, 128]

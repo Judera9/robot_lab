@@ -113,8 +113,7 @@ from isaaclab.envs import (
 )
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
-from skrl.envs.wrappers.isaaclab_rl_skrl import SkrlVecEnvWrapper
-from isaaclab_tasks.utils import get_checkpoint_path
+from skrl.envs.wrappers.isaaclab_rl_skrl import SkrlVecEnvWrapper, get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
 import robot_lab  # noqa: F401
@@ -222,6 +221,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, expe
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
+            # outputs = runner.agent.act(actor_obs, timestep=0, timesteps=0)
             outputs = runner.agent.act_eval(actor_obs, timestep=0, timesteps=0)
             # - multi-agent (deterministic) actions
             if hasattr(env, "possible_agents"):
