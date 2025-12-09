@@ -116,6 +116,9 @@ from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkp
 from skrl.envs.wrappers.isaaclab_rl_skrl import SkrlVecEnvWrapper, get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
+from robot_lab.envs.custom_based_rl_env_cfg import CustomBasedRLEnvCfg
+from robot_lab.envs.custom_based_rl_env import CustomBasedRLEnv
+
 import robot_lab  # noqa: F401
 
 # config shortcuts
@@ -128,7 +131,7 @@ else:
 
 
 @hydra_task_config(args_cli.task, agent_cfg_entry_point)
-def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, experiment_cfg: dict):
+def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | CustomBasedRLEnvCfg, experiment_cfg: dict):
     """Play with skrl agent."""
     # override configurations with non-hydra CLI arguments
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
@@ -156,7 +159,22 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, expe
             print("[INFO] Unfortunately a pre-trained checkpoint is currently unavailable for this task.")
             return
     elif args_cli.checkpoint:
-        resume_path = os.path.abspath(args_cli.checkpoint)
+        # Check if checkpoint is a number (e.g., "9000") or a full path
+        if args_cli.checkpoint.isdigit():
+            # It's a checkpoint number, construct the path with the specified run
+            if args_cli.load_run is not None:
+                resume_path = get_checkpoint_path(
+                    log_root_path, 
+                    run_dir=f".*_{algorithm}_{args_cli.ml_framework}", 
+                    other_dirs=["checkpoints"], 
+                    checkpoint=f"agent_{args_cli.checkpoint}.pt",
+                    load_run=args_cli.load_run
+                )
+            else:
+                raise ValueError("When using checkpoint number, --load_run must be specified")
+        else:
+            # It's a full path
+            resume_path = os.path.abspath(args_cli.checkpoint)
     else:
         if args_cli.load_run is not None:
             resume_path = get_checkpoint_path(
@@ -212,7 +230,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, expe
     runner.agent.set_running_mode("eval")
 
     # reset environment
-    states, actor_obs, _ = env.reset()
+    observations_dict, _ = env.reset()
+    states = observations_dict.pop("critic")
+    actor_observations = observations_dict.pop("policy")
+    other_observations = observations_dict
     timestep = 0
     # simulate environment
     while simulation_app.is_running():
@@ -221,8 +242,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, expe
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
-            # outputs = runner.agent.act(actor_obs, timestep=0, timesteps=0)
-            outputs = runner.agent.act_eval(actor_obs, timestep=0, timesteps=0)
+            # outputs = runner.agent.act(actor_observations, timestep=0, timesteps=0)
+            outputs = runner.agent.act_eval(actor_observations, timestep=0, timesteps=0)
             # - multi-agent (deterministic) actions
             if hasattr(env, "possible_agents"):
                 actions = {a: outputs[-1][a].get("mean_actions", outputs[0][a]) for a in env.possible_agents}
@@ -230,7 +251,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, expe
             else:
                 actions = outputs[-1].get("mean_actions", outputs[0])
             # env stepping
-            states, actor_obs, _, _, _, _ = env.step(actions)
+            next_observations_dict, _, _, _, _ = env.step(actions)
+            states = next_observations_dict.pop("critic")
+            actor_observations = next_observations_dict.pop("policy")
+            other_observations = next_observations_dict
         if args_cli.video:
             timestep += 1
             # exit the play loop after recording one video

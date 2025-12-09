@@ -11,7 +11,7 @@ from . import agents
 
 gym.register(
     id="RobotLab-Isaac-Velocity-Rough-Unitree-G1-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    entry_point="robot_lab.envs:CustomBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": f"{__name__}.rough_env_cfg:UnitreeG1RoughEnvCfg",
@@ -24,7 +24,7 @@ gym.register(
 
 gym.register(
     id="RobotLab-Isaac-Velocity-Flat-Unitree-G1-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    entry_point="robot_lab.envs:CustomBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": f"{__name__}.flat_env_cfg:UnitreeG1FlatEnvCfg",

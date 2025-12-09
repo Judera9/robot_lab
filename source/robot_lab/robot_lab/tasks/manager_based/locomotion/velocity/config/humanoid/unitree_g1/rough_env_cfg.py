@@ -10,7 +10,22 @@ from robot_lab.tasks.manager_based.locomotion.velocity.velocity_env_cfg import L
 # Pre-defined configs
 ##
 from isaaclab_assets.robots.unitree import G1_MINIMAL_CFG  # isort: skip
+from isaaclab.managers import ObservationGroupCfg as ObsGroup
+from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
+@configclass
+class VelEstCfg(ObsGroup):
+
+    base_lin_vel = ObsTerm(
+        func=mdp.base_lin_vel,
+        clip=(-100.0, 100.0),
+        scale=1.0,
+    )
+
+    def __post_init__(self):
+        self.enable_corruption = False
+        self.concatenate_terms = True
 
 @configclass
 class UnitreeG1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
@@ -62,6 +77,8 @@ class UnitreeG1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.observations.policy.height_scan = None
         self.observations.policy.joint_pos.params["asset_cfg"].joint_names = self.joint_names
         self.observations.policy.joint_vel.params["asset_cfg"].joint_names = self.joint_names
+
+        self.observations.vel_est = VelEstCfg()
 
         # ------------------------------Actions------------------------------
         # reduce action scale
