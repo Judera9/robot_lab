@@ -52,14 +52,14 @@ models:
 
   value:  # see deterministic_model parameters
     class: SimpleDeterministic
-    critic_hidden_dims: [512, 256, 128]
+    hidden_dims: [512, 256, 128]
     activation: elu
 
 
 # Rollout memory
 # https://skrl.readthedocs.io/en/latest/api/memories/random.html
 memory:
-  class: RandomMemory
+  class: Memory
   memory_size: -1  # automatically determined (same as agent:rollouts)
 
 
