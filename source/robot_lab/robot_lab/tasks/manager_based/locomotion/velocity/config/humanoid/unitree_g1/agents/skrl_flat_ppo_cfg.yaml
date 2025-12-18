@@ -11,22 +11,22 @@ seed: 42
 models:
   separate: True
 
-  vel_encoder:
-    class: Encoder
-    network_type: mlp
-    input_key: policy
-    output_key: vel_est
-    # latent_dim: 64
-    hidden_dims: [256, 128]
-    activation: elu
-    # input_mode only affects Runner's space selection:
-    # - obs_only (default): uses observation_space
-    # - state_only: uses state_space  
-    # For recurrent networks, use:
-    # network_type: recurrent
-    # recurrent_type: lstm  # or gru
-    # num_layers: 1
-    # hidden_size: 256
+  # vel_encoder:
+  #   class: Encoder
+  #   network_type: mlp
+  #   input_key: policy
+  #   output_key: vel_est
+  #   # latent_dim: 64
+  #   hidden_dims: [256, 128]
+  #   activation: elu
+  #   # input_mode only affects Runner's space selection:
+  #   # - obs_only (default): uses observation_space
+  #   # - state_only: uses state_space  
+  #   # For recurrent networks, use:
+  #   # network_type: recurrent
+  #   # recurrent_type: lstm  # or gru
+  #   # num_layers: 1
+  #   # hidden_size: 256
 
   policy:  # see gaussian_model parameters
     class: SimpleGaussian
@@ -34,7 +34,7 @@ models:
     actor_hidden_dims: [512, 256, 128]
     activation: elu
     noise_std_type: "log"
-    input_key: policy + vel_est
+    input_key: policy # + vel_est
     share_std_backbone: False
     use_scale_tril: False  # must use share_std_backbone?
     output_action_scale: False
@@ -80,7 +80,7 @@ agent:
     max_lr: 1.0e-02
     kl_factor: 2.0
     lr_factor: 1.5
-  use_encoder: True
+  use_encoder: False
   encoder_kwargs:
     model_name: vel_encoder
     obs_name: vel_est

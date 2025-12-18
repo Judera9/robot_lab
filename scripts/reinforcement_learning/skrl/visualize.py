@@ -118,6 +118,8 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 
 from robot_lab.envs.custom_based_rl_env_cfg import CustomBasedRLEnvCfg
 from robot_lab.envs.custom_based_rl_env import CustomBasedRLEnv
+from robot_lab.envs.rwm_env import ModelBasedRLEnv, ModelBasedVisEnv, ModelBasedRLEnvCfg
+from skrl.agents.ppo.mbpo_ppo import MBPO_PPO
 
 import robot_lab  # noqa: F401
 
@@ -129,19 +131,13 @@ else:
     agent_cfg_entry_point = args_cli.agent
     algorithm = agent_cfg_entry_point.split("_cfg")[0].split("skrl_")[-1].lower()
 
-
-RECORD_DATA = True
-SAVE_WORLD_MODEL = True
-
-if RECORD_DATA:
-    from skrl.utils.log_utils.data_recorder import DataRecorder
-    data_recorder = DataRecorder()
-
 @hydra_task_config(args_cli.task, agent_cfg_entry_point)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | CustomBasedRLEnvCfg, experiment_cfg: dict):
     """Play with skrl agent."""
     # override configurations with non-hydra CLI arguments
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
+    if True:  # TODO: set a flag to enable imagination compare with real environment
+        env_cfg.scene.num_envs *= 2
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
     # randomly sample a seed if seed = -1
@@ -243,21 +239,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     other_observations = observations_dict
     timestep = 0
 
-    if RECORD_DATA:
-        data_recorder.register_topic("states", deque_length=1000, update_frequency_hz=1/dt)
-        data_recorder.register_topic("actions", deque_length=1000, update_frequency_hz=1/dt)
-        data_recorder.register_topics(list(other_observations.keys()), deque_length=1000, update_frequency_hz=1/dt)
-
-    if SAVE_WORLD_MODEL:
-        from skrl.models.rwm_world_model import SystemDynamicsEnsemble
-        world_model_to_save: SystemDynamicsEnsemble = runner.agent.world_model
-        world_model_to_save.save_with_config(
-            os.path.join(log_dir, "world_model.pt"),
-            state_normalizer=runner.agent._rwm_state_normalizer,
-            action_normalizer=runner.agent._rwm_action_normalizer,
-        )
-
     # simulate environment
+    if isinstance(env._unwrapped, ModelBasedVisEnv) and isinstance(runner.agent, MBPO_PPO):
+        # init some visualization settings
+        env._unwrapped.init(
+            experiment_cfg["agent"]["world_model_kwargs"]["num_imagination_envs"],
+            experiment_cfg["agent"]["world_model_kwargs"]["num_imagination_steps"],
+            runner.agent._rwm_state_normalizer,
+            runner.agent._rwm_action_normalizer,
+            runner.agent.world_model,
+        )
+        env._unwrapped.init_imagination_history(experiment_cfg["models"]["rwm_world_model"]["history_horizon"])
+
     while simulation_app.is_running():
         start_time = time.time()
 
@@ -277,11 +270,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
             states = next_observations_dict.pop("critic")
             actor_observations = next_observations_dict.pop("policy")
             other_observations = next_observations_dict
-
-            if RECORD_DATA:
-                data_recorder.update_topics(other_observations)
-                if max(data_recorder.update_counts.values()) == 1000:
-                    data_recorder.save_all_data(os.path.join(log_dir, "data_recorder"), format="csv")
 
         if args_cli.video:
             timestep += 1

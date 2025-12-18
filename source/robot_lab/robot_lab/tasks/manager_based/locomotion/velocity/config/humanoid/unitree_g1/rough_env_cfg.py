@@ -78,8 +78,8 @@ class UnitreeG1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.observations.policy.joint_pos.params["asset_cfg"].joint_names = self.joint_names
         self.observations.policy.joint_vel.params["asset_cfg"].joint_names = self.joint_names
 
-        self.observations.vel_est = VelEstCfg()
-        # self.observations.vel_est = None
+        # self.observations.vel_est = VelEstCfg()
+        self.observations.vel_est = None
 
         # ------------------------------Actions------------------------------
         # reduce action scale

@@ -33,3 +33,23 @@ gym.register(
         "skrl_cfg_entry_point": f"{agents.__name__}:skrl_flat_ppo_cfg.yaml",
     },
 )
+
+gym.register(
+    id="RobotLab-Isaac-Velocity-Flat-Unitree-G1-Pretrain-RWM-v0",
+    entry_point="robot_lab.envs:ModelBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rwm_flat_env_cfg:RWMUnitreeG1FlatEnvCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_rwm_cfg.yaml",
+    },
+)
+
+gym.register(
+    id="RobotLab-Isaac-Velocity-Flat-Unitree-G1-Vis-RWM-v0",
+    entry_point="robot_lab.envs:ModelBasedVisEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.rwm_flat_env_cfg:RWMUnitreeG1FlatEnvVisCfg",
+        "skrl_cfg_entry_point": f"{agents.__name__}:skrl_rwm_cfg.yaml",
+    },
+)
