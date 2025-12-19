@@ -160,7 +160,7 @@ class RWMUnitreeG1FlatEnvVisCfg(RWMUnitreeG1FlatEnvCfg):
         self.events.randomize_com_positions = None
         self.events.randomize_apply_external_force_torque = None
         self.events.randomize_reset_joints = None
-        
+         
         # If the weight of rewards is 0, set rewards to None
         if self.__class__.__name__ == "RWMUnitreeG1FlatEnvVisCfg":
             self.disable_zero_weight_rewards()

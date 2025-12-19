@@ -12,8 +12,7 @@
 from __future__ import annotations
 
 import torch
-from tensordict import TensorDict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Union
 
 if TYPE_CHECKING:
     from omni.isaac.lab.envs import ManagerBasedRLEnv
@@ -25,7 +24,7 @@ __all__ = ["compute_symmetric_states"]
 @torch.no_grad()
 def compute_symmetric_states(
     env: ManagerBasedRLEnv,
-    obs: TensorDict | None = None,
+    obs: Dict[str, torch.Tensor] | None = None,
     actions: torch.Tensor | None = None,
 ):
     """Augments the given observations and actions by applying symmetry transformations.
@@ -46,9 +45,14 @@ def compute_symmetric_states(
 
     # observations
     if obs is not None:
-        batch_size = obs.batch_size[0]
+        # Get batch size from the first tensor in the dict
+        first_key = next(iter(obs))
+        batch_size = obs[first_key].shape[0]
         # since we have 4 different symmetries, we need to augment the batch size by 4
-        obs_aug = obs.repeat(4)
+        # Manually repeat each tensor in the dict
+        obs_aug = {}
+        for key, value in obs.items():
+            obs_aug[key] = value.repeat(4, *([1] * (len(value.shape) - 1)))
 
         # policy observation group
         # -- original

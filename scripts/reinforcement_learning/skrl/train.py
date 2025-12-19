@@ -17,6 +17,10 @@ a more user-friendly way.
 
 import argparse
 import sys
+import os
+
+algorithm_skrl_path = '/workspace/isaaclab/skrl'
+sys.path.insert(0, algorithm_skrl_path)
 
 from isaaclab.app import AppLauncher
 

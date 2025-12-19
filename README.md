@@ -2,15 +2,18 @@
 
 ```
 # Install IsaacLab
-uv venv --python 3.11/3.10 env_isaaclab
+uv venv --python 3.11 env_isaaclab
 source env_isaaclab/bin/activate
 uv pip install --upgrade pip
 uv pip install -U torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
-uv pip install isaaclab[isaacsim,all]==2.3.0/2.2.0 --extra-index-url https://pypi.nvidia.com
+uv pip install isaaclab[isaacsim,all]==2.2.0 --extra-index-url https://pypi.nvidia.com
 isaacsim
 
 # Install robot_lab
-pip install -e source/robot_lab
+cd robot_lab
+pip install -e .
+cd ../skrl
+pip install -e .
 ```
 
 # robot_lab
