@@ -1,3 +1,18 @@
+# robot_lab Jude
+
+```
+# Install IsaacLab
+uv venv --python 3.11/3.10 env_isaaclab
+source env_isaaclab/bin/activate
+uv pip install --upgrade pip
+uv pip install -U torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+uv pip install isaaclab[isaacsim,all]==2.3.0/2.2.0 --extra-index-url https://pypi.nvidia.com
+isaacsim
+
+# Install robot_lab
+pip install -e source/robot_lab
+```
+
 # robot_lab
 
 [![IsaacSim](https://img.shields.io/badge/IsaacSim-5.1.0-silver.svg)](https://docs.omniverse.nvidia.com/isaacsim/latest/overview.html)

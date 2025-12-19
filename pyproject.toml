@@ -2,6 +2,27 @@
 requires = ["setuptools", "toml"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "robot_lab"
+version = "2.3.0"
+description = "Robot Lab for Humanoid Motion, Modified by Jude"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Ziqi Fan"},
+    {name = "Jude"},
+]
+keywords = ["robotics", "humanoid", "motion"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
 [tool.isort]
 
 atomic = true
@@ -106,3 +127,10 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "source"}
+
+[tool.setuptools.packages.find]
+where = ["source"]
+include = ["robot_lab*"]
