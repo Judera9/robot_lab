@@ -12,7 +12,7 @@ from isaaclab.utils import configclass
 import robot_lab.tasks.manager_based.locomotion.velocity.mdp as mdp
 
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedEnv
+    from isaaclab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
 
 class UniformThresholdVelocityCommand(mdp.UniformVelocityCommand):

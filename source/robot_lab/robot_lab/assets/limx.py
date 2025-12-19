@@ -35,24 +35,51 @@ LIMX_HUD03_03_CFG_JOINT_NAMES = [
     "left_hip_roll_joint",
     "left_hip_yaw_joint",
     "left_knee_joint",
-    "left_ankle_pitch_joint",
-    "left_ankle_roll_joint",
-    # "left_A_achilles_joint",
-    # "left_B_achilles_joint",
+    # "left_ankle_pitch_joint",
+    # "left_ankle_roll_joint",
+    "left_A_achilles_joint",
+    "left_B_achilles_joint",
     "right_hip_pitch_joint",
     "right_hip_roll_joint",
     "right_hip_yaw_joint",
     "right_knee_joint",
-    "right_ankle_pitch_joint",
-    "right_ankle_roll_joint",
-    # "right_A_achilles_joint",
-    # "right_B_achilles_joint",
+    # "right_ankle_pitch_joint",
+    # "right_ankle_roll_joint",
+    "right_A_achilles_joint",
+    "right_B_achilles_joint",
     # waist
     "waist_yaw_joint",
-    "waist_roll_joint",
-    "waist_pitch_joint",
-    # "waist_B_joint",
-    # "waist_A_joint",
+    # "waist_roll_joint",
+    # "waist_pitch_joint",
+    "waist_B_joint",
+    "waist_A_joint",
+    # head
+    "head_yaw_joint",
+    "head_pitch_joint",
+    # arm
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_yaw_joint",
+    "left_wrist_pitch_joint",
+    "left_hand_yaw_joint",
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_shoulder_yaw_joint",
+    "right_elbow_joint",
+    "right_wrist_yaw_joint",
+    "right_wrist_pitch_joint",
+    "right_hand_yaw_joint",
+]
+
+JOINT_UPBODY_NAMES = [
+    # waist
+    "waist_yaw_joint",
+    # "waist_roll_joint",
+    # "waist_pitch_joint",
+    "waist_A_joint",
+    "waist_B_joint",
     # head
     "head_pitch_joint",
     "head_yaw_joint",
@@ -72,6 +99,41 @@ LIMX_HUD03_03_CFG_JOINT_NAMES = [
     "right_wrist_pitch_joint",
     "right_hand_yaw_joint",
 ]
+
+JOINT_WEIGHTS = [
+    0.5,  # left hip pitch joint
+    1.2,  # left hip roll joint
+    1.0,  # left hip yaw joint
+    0.5,  # left knee joint
+    1.0,  # left ankle pitch joint
+    1.5,  # left ankle roll joint
+    0.5,  # right hip pitch joint
+    1.2,  # right hip roll joint
+    1.0,  # right hip yaw joint
+    0.5,  # right knee joint
+    1.0,  # right ankle pitch joint
+    1.5,  # right ankle roll joint
+    1.0,  # waist yaw joint
+    1.2,  # waist roll joint
+    1.2,  # waist pitch joint
+    1.5,  # head pitch joint
+    1.5,  # head yaw joint
+    1.2,  # left shoulder pitch joint
+    1.8,  # left shoulder roll joint
+    1.2,  # left shoulder yaw joint
+    1.5,  # left elbow joint
+    1.5,  # left hand yaw joint
+    1.5,  # left hand roll joint
+    1.5,  # left hand pitch joint
+    1.2,  # right shoulder pitch joint
+    1.8,  # right shoulder roll joint
+    1.2,  # right shoulder yaw joint
+    1.5,  # right elbow joint
+    1.5,  # right hand yaw joint
+    1.5,  # right hand roll joint
+    1.5,  # right hand pitch joint
+]
+
 LIMX_HUD03_03_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/Robots/limx/HU_D03/usd/HU_D03_03.usd",

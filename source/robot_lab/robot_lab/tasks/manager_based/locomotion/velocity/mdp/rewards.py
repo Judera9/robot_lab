@@ -678,3 +678,203 @@ def flat_orientation_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = Scen
     reward = torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
     reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
     return reward
+
+""" AMP Locomotion for D03 """
+
+def tracking_contacts_shaped_contacts(
+    env: ManagerBasedRLEnv,
+    sensor_cfg: SceneEntityCfg,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), 
+    std_force: float = 1.0,
+    std_vel: float = 1.0, 
+) -> torch.Tensor:
+    if not hasattr(env, "obs_buf"):
+        return 0
+
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    net_contact_forces = contact_sensor.data.net_forces_w
+
+    asset:RigidObject = env.scene[asset_cfg.name]
+    left_velocity = torch.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids[0], :7], dim=-1)
+    right_velocity = torch.norm(asset.data.body_lin_vel_w[:, asset_cfg.body_ids[1], :7], dim=-1)
+
+    assert env.gait_handler is not None and env.gait_handler.get_init_flag() == True, "gait_handler is not initialized or not exist"
+    gait_handler:GaitHandler = env.gait_handler
+
+    desired_contact_states = gait_handler.get_desired_contact_states()
+
+    # force penalty while no contact
+    reward = (1 - desired_contact_states[:, 0]) * torch.exp(-net_contact_forces[:, sensor_cfg.body_ids[0], 2] ** 2 / std_force**2) \
+            + (1 - desired_contact_states[:, 1]) * torch.exp(-net_contact_forces[:, sensor_cfg.body_ids[1], 2] ** 2 / std_force**2)
+    # speed penalty while contact
+    reward += desired_contact_states[:, 0] * torch.exp(-left_velocity ** 2 / std_vel**2) \
+            + desired_contact_states[:, 1] * torch.exp(-right_velocity ** 2 / std_vel**2)
+    
+    # stand_still_flag = gait_handler.get_stand_still_flag()
+    # return reward / 1. * ~stand_still_flag
+    return reward / 2.
+
+def natural_swing_arm(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    std_pos,
+    std_vel,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    if not hasattr(env, "obs_buf"):
+        return 0
+
+    assert env.gait_handler is not None and env.gait_handler.get_init_flag() == True, "gait_handler is not initialized or not exist"
+    gait_handler:GaitHandler = env.gait_handler
+
+    asset: RigidObject = env.scene[asset_cfg.name]
+    left_hand_idx = asset.data.body_names.index("left_hand_contact")
+    right_hand_idx = asset.data.body_names.index("right_hand_contact")
+
+    idx = [left_hand_idx, right_hand_idx]
+    hand_positions = asset.data.body_pos_w[:, idx]
+    hand_velocities = asset.data.body_lin_vel_w[:, idx]
+    
+    gait_info = env.obs_buf["policy"][:, -5:]
+    if data_cache.get_init_flag() == False:
+        data_cache.init(env.num_envs, env.device)
+    
+    des_hand_positions_x = data_cache.get_des_hand_positions_x()
+    des_hand_velocity_x = data_cache.get_des_hand_velocity_x()
+
+    command = env.command_manager.get_command(command_name)
+    arm_swing_distance = (0.12 + 0.12 * torch.abs(command[: ,0])) \
+                        * torch.where(command[:, 0] < 0., torch.tensor(-1.), torch.tensor(1.))
+    des_hand_positions_x[:, 0] = -arm_swing_distance * gait_info[:, 4]
+    des_hand_positions_x[:, 1] = arm_swing_distance * gait_info[:, 4]
+    des_hand_velocity_x[:, 0] = 2.0 * arm_swing_distance * torch.pi * gait_info[:, 0] * gait_info[:, 3]
+    des_hand_velocity_x[:, 1] = -2.0 * arm_swing_distance * torch.pi * gait_info[:, 0] * gait_info[:, 3]
+    
+    hand_pos_body = torch.zeros_like(hand_positions)
+    hand_vel_body = torch.zeros_like(hand_velocities)
+
+    body_quat = asset.data.root_quat_w
+    body_pos = asset.data.root_pos_w
+    hand_pos_body[:, 0] = math_utils.quat_rotate_inverse(body_quat, hand_positions[:, 0] - body_pos)
+    hand_pos_body[:, 1] = math_utils.quat_rotate_inverse(body_quat, hand_positions[:, 1] - body_pos)
+    
+    body_vel = asset.data.root_lin_vel_w
+    hand_vel_body[:, 0] = math_utils.quat_rotate_inverse(body_quat, hand_velocities[:, 0] - body_vel)
+    hand_vel_body[:, 1] = math_utils.quat_rotate_inverse(body_quat, hand_velocities[:, 1] - body_vel)
+    
+    reward = torch.exp(-(hand_pos_body[:, 0, 0] - des_hand_positions_x[:, 0])**2 / std_pos**2)  \
+            + torch.exp(-(hand_pos_body[:, 1, 0] - des_hand_positions_x[:, 1])**2 / std_pos**2) \
+            + torch.exp(-(hand_vel_body[:, 0, 0] - des_hand_velocity_x[:, 0])**2 / std_vel**2)  \
+            + torch.exp(-(hand_vel_body[:, 1, 0] - des_hand_velocity_x[:, 1])**2 / std_vel**2)
+    
+    stand_still_flag = gait_handler.get_stand_still_flag()
+    return reward / 4. * ~stand_still_flag
+
+def straight_knee(
+    env: ManagerBasedRLEnv, 
+    std: float, 
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    if not hasattr(env, "obs_buf"):
+        return 0
+    
+    assert env.gait_handler is not None and env.gait_handler.get_init_flag() == True, "gait_handler is not initialized or not exist"
+    gait_handler:GaitHandler = env.gait_handler
+
+    asset: Articulation = env.scene[asset_cfg.name]
+    gait_info = env.obs_buf["policy"][:, -5:]
+    stand_still_flag = gait_handler.get_stand_still_flag()
+
+    left_sin = gait_info[:, 3]
+    right_sin = gait_info[:, 4]
+    knee_angle = asset.data.joint_pos[:, asset_cfg.joint_ids]
+    return torch.exp(-torch.abs(knee_angle[:, 0] * (1 - left_sin)) / std) + torch.exp(-torch.abs(knee_angle[:, 1] * (1 - right_sin)) / std) * ~stand_still_flag
+
+def body_ang_vel_l2(
+    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+
+    # get torso orientation state
+    asset: RigidObject = env.scene[asset_cfg.name]
+    body_ang_vel = asset.data.body_ang_vel_w[:, asset_cfg.body_ids, :2].squeeze(1)
+    return torch.sum(torch.sum(torch.square(body_ang_vel), dim=1), dim=1)  # sum over body ids and x, y components
+
+def body_projected_gravity_l2(env: ManagerBasedRLEnv, std: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+
+    # get torso orientation state
+    asset: RigidObject = env.scene[asset_cfg.name]
+    # this function only feasible for 2 body ids (here, waist and base)
+    body_projected_gravity_0 = math_utils.quat_rotate_inverse(asset.data.body_quat_w[:, asset_cfg.body_ids[0]].squeeze(1), asset.data.GRAVITY_VEC_W)
+    body_projected_gravity_1 = math_utils.quat_rotate_inverse(asset.data.body_quat_w[:, asset_cfg.body_ids[1]].squeeze(1), asset.data.GRAVITY_VEC_W)
+    return torch.sum(torch.square(body_projected_gravity_0[:, :2]) / std ** 2, dim=1) + torch.sum(torch.square(body_projected_gravity_1[:, :2]) / std ** 2, dim=1)
+
+
+def joint_acc_weights_l2(
+    env: ManagerBasedRLEnv, joint_weights: list = None, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Penalize joint accelerations on the articulation using L2 squared kernel.
+
+    NOTE: Only the joints configured in :attr:`asset_cfg.joint_ids` will have their joint accelerations contribute to the term.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    if joint_weights is not None:
+        joint_weights_tensor = torch.tensor(joint_weights, device=env.device, requires_grad=False)
+    else:
+        joint_weights_tensor = torch.ones_like(torque, device=env.device, requires_grad=False)
+    return torch.sum(torch.square(asset.data.joint_acc[:, asset_cfg.joint_ids]) * joint_weights_tensor, dim=1)
+
+
+def joint_vel_weights_l2(
+    env: ManagerBasedRLEnv, joint_weights: list = None, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Penalize joint velocities on the articulation using L2 squared kernel.
+
+    NOTE: Only the joints configured in :attr:`asset_cfg.joint_ids` will have their joint velocities contribute to the term.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    if joint_weights is not None:
+        joint_weights_tensor = torch.tensor(joint_weights, device=env.device, requires_grad=False)
+    else:
+        joint_weights_tensor = torch.ones_like(torque, device=env.device, requires_grad=False)
+    return torch.sum(torch.square(asset.data.joint_vel[:, asset_cfg.joint_ids]) * joint_weights_tensor, dim=1)
+
+
+def joint_torques_weights_l2(
+    env: ManagerBasedRLEnv, joint_weights: list = None, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Penalize joint torques applied on the articulation using L2 squared kernel.
+
+    NOTE: Only the joints configured in :attr:`asset_cfg.joint_ids` will have their joint torques contribute to the term.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    if joint_weights is not None:
+        joint_weights_tensor = torch.tensor(joint_weights, device=env.device, requires_grad=False)
+    else:
+        joint_weights_tensor = torch.ones_like(torque, device=env.device, requires_grad=False)
+    return torch.sum(torch.square(asset.data.applied_torque[:, asset_cfg.joint_ids]) * joint_weights_tensor, dim=1)
+
+def joint_pos_limits_weights(
+    env: ManagerBasedRLEnv, joint_weights: list = None, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Penalize joint positions if they cross the soft limits.
+
+    This is computed as a sum of the absolute value of the difference between the joint position and the soft limits.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    # weights
+    if joint_weights is not None:
+        joint_weights_tensor = torch.tensor(joint_weights, device=env.device, requires_grad=False)
+    else:
+        joint_weights_tensor = torch.ones_like(torque, device=env.device, requires_grad=False)
+    # compute out of limits constraints
+    out_of_limits = -(
+        asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.soft_joint_pos_limits[:, asset_cfg.joint_ids, 0]
+    ).clip(max=0.0)
+    out_of_limits += (
+        asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.soft_joint_pos_limits[:, asset_cfg.joint_ids, 1]
+    ).clip(min=0.0)
+    return torch.sum(out_of_limits * joint_weights_tensor, dim=1)

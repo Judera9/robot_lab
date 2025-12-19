@@ -11,7 +11,7 @@ from isaaclab.utils.math import matrix_from_quat, subtract_frame_transforms
 from robot_lab.tasks.manager_based.beyondmimic.mdp.commands import MotionCommand
 
 if TYPE_CHECKING:
-    from isaaclab.envs import ManagerBasedEnv
+    from isaaclab.envs import ManagerBasedEnv, ManagerBasedRLEnv
 
 
 def robot_anchor_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:

@@ -11,6 +11,7 @@ from typing import Any, Sequence
 from isaaclab.envs.common import VecEnvStepReturn
 from isaaclab.envs.manager_based_rl_env import ManagerBasedRLEnv
 from isaaclab.managers import RewardManager
+from robot_lab.tasks.manager_based.locomotion.velocity.mdp.extensions.gait import GaitHandler
 
 from .custom_based_rl_env_cfg import CustomBasedRLEnvCfg
 
@@ -28,6 +29,17 @@ class CustomBasedRLEnv(ManagerBasedRLEnv):
             render_mode: The render mode for the environment. Defaults to None.
         """
         super().__init__(cfg=cfg, render_mode=render_mode, **kwargs)
+
+        if cfg.use_gait:
+            self.gait_handler = GaitHandler()
+            self.gait_handler.init(
+                kappa=0.05,
+                num_envs=self.num_envs,
+                device=self.device,
+                frequency_range=cfg.gait_handler_cfg["frequency_range"],
+                offset_range=cfg.gait_handler_cfg["offset_range"],
+                height_range=cfg.gait_handler_cfg["height_range"],
+            )
 
     def load_managers(self):
         """Load the managers including the additional reward manager."""
