@@ -50,7 +50,7 @@ models:
     noise_generator: OrnsteinUhlenbeckNoise
     noise_generator_kwargs: 
       theta: 0.5
-      sigma: 0.7
+      sigma: 1.0
       base_scale: 1.0
       mean: 0.0
       std: 1.0
