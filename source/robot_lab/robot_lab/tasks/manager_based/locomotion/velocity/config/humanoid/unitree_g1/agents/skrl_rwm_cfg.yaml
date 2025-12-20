@@ -41,13 +41,19 @@ models:
     min_log_std: -20.0
     max_action: 100.0
     min_action: -100.0
-    noise_generator: None
+    # OrnsteinUhlenbeckNoise, PinkNoiseDist or None
+    # theta: control the decay speed of the noise: tune 0.5 ~ 0.7
+    # sigma: control the amplitude of the noise: tune 0.7 ~ 1.0
+    # base_scale: control the base scale of the noise: tune 1.0 ~ 2.0
+    # mean: control the mean of the noise: tune 0.0 ~ 1.0
+    # std: control the standard deviation of the noise: tune 1.0 ~ 2.0
+    noise_generator: OrnsteinUhlenbeckNoise
     noise_generator_kwargs: 
-      theta: 0.5  # control the decay speed of the noise: tune 0.5 ~ 0.7
-      sigma: 0.7  # control the amplitude of the noise: tune 0.7 ~ 1.0
-      base_scale: 1.0  # use default 1.0
-      mean: 0.0  # use default 0.0
-      std: 1.0  # use default 1.0
+      theta: 0.5
+      sigma: 0.7
+      base_scale: 1.0
+      mean: 0.0
+      std: 1.0
 
   value:  # see deterministic_model parameters
     class: SimpleDeterministic
@@ -110,7 +116,7 @@ agent:
   entropy_loss_scale: 0.005
   entropy_scheduler: ConstantScheduler
   entropy_scheduler_kwargs:
-    decay_factor: 0.90
+    decay_factor: 0.95
     decay_interval: 1000
     min_value: 0.003
   grad_penalty_weight: 0.0
