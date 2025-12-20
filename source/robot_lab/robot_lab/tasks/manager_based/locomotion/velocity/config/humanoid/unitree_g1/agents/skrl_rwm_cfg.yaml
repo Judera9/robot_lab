@@ -110,7 +110,7 @@ agent:
   entropy_loss_scale: 0.005
   entropy_scheduler: ConstantScheduler
   entropy_scheduler_kwargs:
-    decay_factor: 0.95
+    decay_factor: 0.99
     decay_interval: 1000
     min_value: 0.003
   grad_penalty_weight: 0.0
