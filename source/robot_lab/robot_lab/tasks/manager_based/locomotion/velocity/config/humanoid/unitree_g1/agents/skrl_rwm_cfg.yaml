@@ -113,10 +113,10 @@ agent:
   ratio_clip: 0.2
   value_clip: 0.2
   clip_predicted_values: True
-  entropy_loss_scale: 0.005
+  entropy_loss_scale: 0.0045
   entropy_scheduler: ConstantScheduler
   entropy_scheduler_kwargs:
-    decay_factor: 0.99
+    decay_factor: 0.95
     decay_interval: 1000
     min_value: 0.003
   grad_penalty_weight: 0.0
@@ -142,7 +142,7 @@ agent:
     forecast_horizon: 32  # TODO: change this in the future
     num_mini_batches: 20
     mini_batch_size: 5000
-    loss_weights:
+    loss_weights:  # TODO: maybe I should tune this later
       state: 1.0
       sequence: 1.0
       bound: 1.0
