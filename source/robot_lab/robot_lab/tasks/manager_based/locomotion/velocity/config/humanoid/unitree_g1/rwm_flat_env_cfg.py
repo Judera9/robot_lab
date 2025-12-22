@@ -133,7 +133,10 @@ class SampleUniformVelocityCommand(UniformVelocityCommand):
             # set their visibility to true
             self.goal_vel_visualizer.set_visibility(True)
             self.current_vel_visualizer.set_visibility(True)
-            self.imagination_vel_visualizer.set_visibility(True)
+            if hasattr(self._env, "env_ids_real"):
+                self.imagination_vel_visualizer.set_visibility(True)
+            else:
+                self.imagination_vel_visualizer.set_visibility(False)
         else:
             if hasattr(self, "goal_vel_visualizer"):
                 self.goal_vel_visualizer.set_visibility(False)
