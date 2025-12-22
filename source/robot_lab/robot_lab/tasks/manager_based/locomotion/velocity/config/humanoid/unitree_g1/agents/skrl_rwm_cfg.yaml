@@ -113,7 +113,7 @@ agent:
   ratio_clip: 0.2
   value_clip: 0.2
   clip_predicted_values: True
-  entropy_loss_scale: 0.0045
+  entropy_loss_scale: 0.004
   entropy_scheduler: ConstantScheduler
   entropy_scheduler_kwargs:
     decay_factor: 0.95
