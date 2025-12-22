@@ -1,6 +1,8 @@
 # Copyright (c) 2024-2025 Ziqi Fan
 # SPDX-License-Identifier: Apache-2.0
 
+from typing import Sequence
+
 import torch
 import math
 
@@ -10,6 +12,10 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 from isaaclab.envs.mdp.commands.velocity_command import UniformVelocityCommand
+
+from isaaclab.markers import VisualizationMarkers
+from isaaclab.markers import VisualizationMarkersCfg
+from isaaclab.markers.config import RED_ARROW_X_MARKER_CFG
 
 from robot_lab.tasks.manager_based.locomotion.velocity.velocity_env_cfg import ObservationsCfg
 import robot_lab.tasks.manager_based.locomotion.velocity.mdp as mdp
@@ -73,6 +79,29 @@ class ObservationsCfg_PRETRAIN(ObservationsCfg):
     system_termination: SystemTerminationCfg = SystemTerminationCfg()
 
 class SampleUniformVelocityCommand(UniformVelocityCommand):
+    def _resample_command(self, env_ids: Sequence[int]):
+        # sample velocity commands
+        r = torch.empty(len(env_ids), device=self.device)
+        # -- linear velocity - x direction
+        self.vel_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.lin_vel_x)
+        # -- linear velocity - y direction
+        self.vel_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.lin_vel_y)
+        # -- ang vel yaw - rotation around z
+        self.vel_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)
+        # heading target
+        if self.cfg.heading_command:
+            self.heading_target[env_ids] = r.uniform_(*self.cfg.ranges.heading)
+            # update heading envs
+            self.is_heading_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_heading_envs
+        # update standing envs
+        self.is_standing_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_standing_envs
+
+        if hasattr(self._env, "env_ids_real"):
+            self.vel_command_b[self._env.env_ids_imagination] = self.vel_command_b[self._env.env_ids_real]
+            self.heading_target[self._env.env_ids_imagination] = self.heading_target[self._env.env_ids_real]
+            self.is_heading_env[self._env.env_ids_imagination] = self.is_heading_env[self._env.env_ids_real]
+            self.is_standing_env[self._env.env_ids_imagination] = self.is_standing_env[self._env.env_ids_real]
+
     def sample_command(self, num_envs: int):
         # sample velocity commands
         r = torch.empty(num_envs, device=self.device)
@@ -84,6 +113,52 @@ class SampleUniformVelocityCommand(UniformVelocityCommand):
         # -- ang vel yaw - rotation around z
         vel_command_b[:, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)
         return vel_command_b
+
+    def _set_debug_vis_impl(self, debug_vis: bool):
+        # set visibility of markers
+        # note: parent only deals with callbacks. not their visibility
+        if debug_vis:  # TODO: fix this, should not be in HU
+            # create markers if necessary for the first time
+            if not hasattr(self, "goal_vel_visualizer"):
+                # -- goal
+                self.goal_vel_visualizer = VisualizationMarkers(self.cfg.goal_vel_visualizer_cfg)
+                # -- current
+                self.current_vel_visualizer = VisualizationMarkers(self.cfg.current_vel_visualizer_cfg)
+                # -- imagination current
+                imagination_vel_visualizer_cfg : VisualizationMarkersCfg = RED_ARROW_X_MARKER_CFG.replace(
+                    prim_path="/Visuals/Command/velocity_imagination"
+                )
+                imagination_vel_visualizer_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
+                self.imagination_vel_visualizer = VisualizationMarkers(imagination_vel_visualizer_cfg)
+            # set their visibility to true
+            self.goal_vel_visualizer.set_visibility(True)
+            self.current_vel_visualizer.set_visibility(True)
+            self.imagination_vel_visualizer.set_visibility(True)
+        else:
+            if hasattr(self, "goal_vel_visualizer"):
+                self.goal_vel_visualizer.set_visibility(False)
+                self.current_vel_visualizer.set_visibility(False)
+                self.imagination_vel_visualizer.set_visibility(False)
+
+    def _debug_vis_callback(self, event):
+        if not hasattr(self._env, "env_ids_real"):
+            super()._debug_vis_callback(event)
+            return
+        # check if robot is initialized
+        # note: this is needed in-case the robot is de-initialized. we can't access the data
+        if not self.robot.is_initialized:
+            return
+        # get marker location
+        # -- base state
+        base_pos_w = self.robot.data.root_pos_w.clone()
+        base_pos_w[:, 2] += 0.5
+        # -- resolve the scales and quaternions
+        vel_des_arrow_scale, vel_des_arrow_quat = self._resolve_xy_velocity_to_arrow(self.command[:, :2])
+        vel_arrow_scale, vel_arrow_quat = self._resolve_xy_velocity_to_arrow(self.robot.data.root_lin_vel_b[:, :2])
+        # display markers
+        self.goal_vel_visualizer.visualize(base_pos_w, vel_des_arrow_quat, vel_des_arrow_scale)
+        self.current_vel_visualizer.visualize(base_pos_w[self._env.env_ids_real], vel_arrow_quat[self._env.env_ids_real], vel_arrow_scale[self._env.env_ids_real])
+        self.imagination_vel_visualizer.visualize(base_pos_w[self._env.env_ids_imagination], vel_arrow_quat[self._env.env_ids_imagination], vel_arrow_scale[self._env.env_ids_imagination])
 
 @configclass
 class RWMUnitreeG1FlatEnvCfg(UnitreeG1RoughEnvCfg):
@@ -146,10 +221,10 @@ class RWMUnitreeG1FlatEnvVisCfg(RWMUnitreeG1FlatEnvCfg):
         super().__post_init__()
 
         # Commands
-        self.commands.base_velocity.ranges = mdp.UniformThresholdVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.5, 0.5), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(-math.pi, math.pi)
-        )
-
+        # self.commands.base_velocity.ranges = mdp.UniformThresholdVelocityCommandCfg.Ranges(
+        #     lin_vel_x=(0.5, 0.5), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(-math.pi, math.pi)
+        # )
+        self.commands.base_velocity.resampling_time_range = (4.0, 4.0)
         # Events
         self.events.randomize_actuator_gains = None
         self.events.randomize_reset_base = None

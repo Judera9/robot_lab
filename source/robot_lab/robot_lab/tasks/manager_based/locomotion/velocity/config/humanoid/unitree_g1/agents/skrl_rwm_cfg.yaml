@@ -41,6 +41,12 @@ models:
     min_log_std: -20.0
     max_action: 100.0
     min_action: -100.0
+    # OrnsteinUhlenbeckNoise, PinkNoiseDist or None
+    # theta: control the decay speed of the noise: tune 0.5 ~ 0.7
+    # sigma: control the amplitude of the noise: tune 0.7 ~ 1.0
+    # base_scale: control the base scale of the noise: tune 1.0 ~ 2.0
+    # mean: control the mean of the noise: tune 0.0 ~ 1.0
+    # std: control the standard deviation of the noise: tune 1.0 ~ 2.0
     noise_generator: None
     noise_generator_kwargs: 
       theta: 0.5  # control the decay speed of the noise: tune 0.5 ~ 0.7

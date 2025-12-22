@@ -20,6 +20,15 @@ import sys
 
 from isaaclab.app import AppLauncher
 
+RECORD_DATA = True
+SAVE_WORLD_MODEL = True
+ADD_EXPERIMENT_NAME = True
+EXPERIMENT_NAME = "exp: noise & entropy"
+
+if RECORD_DATA:
+    from skrl.utils.log_utils.data_recorder import DataRecorder
+    data_recorder = DataRecorder()
+
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Play a checkpoint of an RL agent from skrl.")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
@@ -129,14 +138,6 @@ else:
     agent_cfg_entry_point = args_cli.agent
     algorithm = agent_cfg_entry_point.split("_cfg")[0].split("skrl_")[-1].lower()
 
-
-RECORD_DATA = True
-SAVE_WORLD_MODEL = True
-
-if RECORD_DATA:
-    from skrl.utils.log_utils.data_recorder import DataRecorder
-    data_recorder = DataRecorder()
-
 @hydra_task_config(args_cli.task, agent_cfg_entry_point)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | CustomBasedRLEnvCfg, experiment_cfg: dict):
     """Play with skrl agent."""
@@ -158,6 +159,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     # specify directory for logging experiments (load checkpoint)
     log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
     log_root_path = os.path.abspath(log_root_path)
+    if ADD_EXPERIMENT_NAME:
+        log_root_path = os.path.join(log_root_path, EXPERIMENT_NAME)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     # get checkpoint path
     if args_cli.use_pretrained_checkpoint:
@@ -279,7 +282,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
             other_observations = next_observations_dict
 
             if RECORD_DATA:
-                data_recorder.update_topics(other_observations)
+                record_env0_data = {}
+                for k, v in other_observations.items():
+                    record_env0_data[k] = v[0]
+                data_recorder.update_topics(record_env0_data)
                 if max(data_recorder.update_counts.values()) == 1000:
                     data_recorder.save_all_data(os.path.join(log_dir, "data_recorder"), format="csv")
 

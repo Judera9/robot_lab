@@ -20,6 +20,9 @@ import sys
 
 from isaaclab.app import AppLauncher
 
+ADD_EXPERIMENT_NAME = True
+EXPERIMENT_NAME = "exp: noise & entropy"
+
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Play a checkpoint of an RL agent from skrl.")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
@@ -154,6 +157,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     # specify directory for logging experiments (load checkpoint)
     log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
     log_root_path = os.path.abspath(log_root_path)
+    if ADD_EXPERIMENT_NAME:
+        log_root_path = os.path.join(log_root_path, EXPERIMENT_NAME)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     # get checkpoint path
     if args_cli.use_pretrained_checkpoint:
