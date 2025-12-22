@@ -36,11 +36,11 @@ models:
     input_key: policy # + vel_est
     share_std_backbone: False
     use_scale_tril: False  # must use share_std_backbone?
-    output_action_scale: False
+    # output_action_scale: False
     max_log_std: 2.0
     min_log_std: -20.0
-    max_action: 100.0
-    min_action: -100.0
+    max_action: 10.0
+    min_action: -10.0
     # OrnsteinUhlenbeckNoise, PinkNoiseDist or None
     # theta: control the decay speed of the noise: tune 0.5 ~ 0.7
     # sigma: control the amplitude of the noise: tune 0.7 ~ 1.0
@@ -49,11 +49,11 @@ models:
     # std: control the standard deviation of the noise: tune 1.0 ~ 2.0
     noise_generator: None
     noise_generator_kwargs: 
-      theta: 0.5  # control the decay speed of the noise: tune 0.5 ~ 0.7
-      sigma: 0.7  # control the amplitude of the noise: tune 0.7 ~ 1.0
-      base_scale: 1.0  # use default 1.0
-      mean: 0.0  # use default 0.0
-      std: 1.0  # use default 1.0
+      theta: 0.5
+      sigma: 0.7
+      base_scale: 1.0
+      mean: 0.0
+      std: 1.0
 
   value:  # see deterministic_model parameters
     class: SimpleDeterministic
@@ -116,7 +116,7 @@ agent:
   entropy_loss_scale: 0.005
   entropy_scheduler: ConstantScheduler
   entropy_scheduler_kwargs:
-    decay_factor: 0.99
+    decay_factor: 0.95
     decay_interval: 1000
     min_value: 0.003
   grad_penalty_weight: 0.0
@@ -139,7 +139,7 @@ agent:
     # system dynamics (world model) training parameters
     learning_rate: 1e-3
     weight_decay: 0.0
-    forecast_horizon: 32  # TODO: change this in the future
+    forecast_horizon: 8
     num_mini_batches: 20
     mini_batch_size: 5000
     loss_weights:
