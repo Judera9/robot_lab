@@ -158,7 +158,7 @@ agent:
 
     # normalizer parameters
     train_normalizer: True
-    stop_train_normalizer_iter: 5000
+    stop_train_normalizer_iter: 10000
     rwm_state_normalizer: EmpiricalNormalization
     rwm_state_normalizer_kwargs: 
       mean: [
