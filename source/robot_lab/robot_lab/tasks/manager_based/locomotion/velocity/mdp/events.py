@@ -356,3 +356,71 @@ def reset_joints_by_offset_visualize(
 
     # set into the physics simulation
     asset.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
+
+""" For RWM, set the same DR for evaluate world model"""
+
+def push_by_setting_velocity_mod(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    velocity_range: dict[str, tuple[float, float]],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    """Push the asset by setting the root velocity to a random value within the given ranges.
+
+    This creates an effect similar to pushing the asset with a random impulse that changes the asset's velocity.
+    It samples the root velocity from the given ranges and sets the velocity into the physics simulation.
+
+    The function takes a dictionary of velocity ranges for each axis and rotation. The keys of the dictionary
+    are ``x``, ``y``, ``z``, ``roll``, ``pitch``, and ``yaw``. The values are tuples of the form ``(min, max)``.
+    If the dictionary does not contain a key, the velocity is set to zero for that axis.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+
+    # velocities
+    vel_w = asset.data.root_vel_w[env_ids]
+    # sample random velocities
+    range_list = [velocity_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
+    ranges = torch.tensor(range_list, device=asset.device)
+    vel_w += math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], vel_w.shape, device=asset.device)
+
+    if hasattr(env, "env_ids_real"):
+        vel_w[1:, ...] = vel_w[0, ...].expand(len(env_ids) - 1, -1)
+    
+    # set the velocities into the physics simulation
+    asset.write_root_velocity_to_sim(vel_w, env_ids=env_ids)
+
+def apply_external_force_torque_mod(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    force_range: tuple[float, float],
+    torque_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    """Randomize the external forces and torques applied to the bodies.
+
+    This function creates a set of random forces and torques sampled from the given ranges. The number of forces
+    and torques is equal to the number of bodies times the number of environments. The forces and torques are
+    applied to the bodies by calling ``asset.set_external_force_and_torque``. The forces and torques are only
+    applied when ``asset.write_data_to_sim()`` is called in the environment.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+    # resolve environment ids
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device=asset.device)
+    # resolve number of bodies
+    num_bodies = len(asset_cfg.body_ids) if isinstance(asset_cfg.body_ids, list) else asset.num_bodies
+
+    # sample random forces and torques
+    size = (len(env_ids), num_bodies, 3)
+    forces = math_utils.sample_uniform(*force_range, size, asset.device)
+    torques = math_utils.sample_uniform(*torque_range, size, asset.device)
+
+    if hasattr(env, "env_ids_real"):
+        forces[1:, ...] = forces[0, ...].expand(len(env_ids) - 1, num_bodies, 3)
+        torques[1:, ...] = torques[0, ...].expand(len(env_ids) - 1, num_bodies, 3)
+
+    # set the forces and torques into the buffers
+    # note: these are only applied when you call: `asset.write_data_to_sim()`
+    asset.set_external_force_and_torque(forces, torques, env_ids=env_ids, body_ids=asset_cfg.body_ids)

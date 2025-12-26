@@ -21,9 +21,8 @@ import sys
 from isaaclab.app import AppLauncher
 
 RECORD_DATA = True
+RECORD_LENGTH = 500
 SAVE_WORLD_MODEL = True
-ADD_EXPERIMENT_NAME = True
-EXPERIMENT_NAME = "exp: noise & entropy"
 
 if RECORD_DATA:
     from skrl.utils.log_utils.data_recorder import DataRecorder
@@ -75,6 +74,8 @@ parser.add_argument(
     help="The RL algorithm used for training the skrl agent.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
+parser.add_argument("--add_experiment_name", action="store_true", default=False, help="Add experiment name to log directory.")
+parser.add_argument("--experiment_name", type=str, default=None, help="Name of the experiment.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -159,8 +160,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     # specify directory for logging experiments (load checkpoint)
     log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
     log_root_path = os.path.abspath(log_root_path)
-    if ADD_EXPERIMENT_NAME:
-        log_root_path = os.path.join(log_root_path, EXPERIMENT_NAME)
+    if args_cli.add_experiment_name:
+        log_root_path = os.path.join(log_root_path, args_cli.experiment_name)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     # get checkpoint path
     if args_cli.use_pretrained_checkpoint:
@@ -235,6 +236,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     runner = Runner(env, experiment_cfg)
 
     print(f"[INFO] Loading model checkpoint from: {resume_path}")
+    runner.agent.resume_world_model = True
+    runner.agent.resume_policy = True
     runner.agent.load(resume_path)
     # set agent to evaluation mode
     runner.agent.set_running_mode("eval")
@@ -247,9 +250,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     timestep = 0
 
     if RECORD_DATA:
-        data_recorder.register_topic("states", deque_length=1000, update_frequency_hz=1/dt)
-        data_recorder.register_topic("actions", deque_length=1000, update_frequency_hz=1/dt)
-        data_recorder.register_topics(list(other_observations.keys()), deque_length=1000, update_frequency_hz=1/dt)
+        data_recorder.register_topic("states", deque_length=RECORD_LENGTH, update_frequency_hz=1/dt)
+        data_recorder.register_topic("actions", deque_length=RECORD_LENGTH, update_frequency_hz=1/dt)
+        data_recorder.register_topics(list(other_observations.keys()), deque_length=RECORD_LENGTH, update_frequency_hz=1/dt)
 
     if SAVE_WORLD_MODEL:
         from skrl.models.rwm_world_model import SystemDynamicsEnsemble

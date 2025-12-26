@@ -20,9 +20,6 @@ import sys
 
 from isaaclab.app import AppLauncher
 
-ADD_EXPERIMENT_NAME = True
-EXPERIMENT_NAME = "exp: noise & entropy"
-
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Play a checkpoint of an RL agent from skrl.")
 parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
@@ -69,6 +66,10 @@ parser.add_argument(
     help="The RL algorithm used for training the skrl agent.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
+parser.add_argument("--add_experiment_name", action="store_true", default=False, help="Add experiment name to log directory.")
+parser.add_argument("--experiment_name", type=str, default=None, help="Name of the experiment.")
+parser.add_argument("--add_noise", action="store_true", default=False, help="Add noise to the environment.")
+parser.add_argument("--noise_scale", type=float, default=0.1, help="Scale of the noise.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -157,8 +158,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     # specify directory for logging experiments (load checkpoint)
     log_root_path = os.path.join("logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
     log_root_path = os.path.abspath(log_root_path)
-    if ADD_EXPERIMENT_NAME:
-        log_root_path = os.path.join(log_root_path, EXPERIMENT_NAME)
+    if args_cli.add_experiment_name:
+        log_root_path = os.path.join(log_root_path, args_cli.experiment_name)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     # get checkpoint path
     if args_cli.use_pretrained_checkpoint:
@@ -233,6 +234,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
     runner = Runner(env, experiment_cfg)
 
     print(f"[INFO] Loading model checkpoint from: {resume_path}")
+    runner.agent.resume_world_model = True
+    runner.agent.resume_policy = True
     runner.agent.load(resume_path)
     # set agent to evaluation mode
     runner.agent.set_running_mode("eval")
@@ -254,6 +257,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg | Cus
             runner.agent._rwm_action_normalizer,
             runner.agent.world_model,
         )
+        if args_cli.add_noise:
+            env._unwrapped.set_noise_scale(args_cli.noise_scale)
         env._unwrapped.init_imagination_history(experiment_cfg["models"]["rwm_world_model"]["history_horizon"])
 
     while simulation_app.is_running():

@@ -113,7 +113,7 @@ agent:
   ratio_clip: 0.2
   value_clip: 0.2
   clip_predicted_values: True
-  entropy_loss_scale: 0.005
+  entropy_loss_scale: 0.0045
   entropy_scheduler: ConstantScheduler
   entropy_scheduler_kwargs:
     decay_factor: 0.95
@@ -127,10 +127,19 @@ agent:
   world_model: SystemDynamicsEnsemble
   world_model_kwargs:
 
-    # imagination parameters
+    # training settings
+    resume_world_model: False
     train_world_model: True
-    train_policy: True
+    resume_policy: True
+    train_policy: False
+    std_annealing_scheduler: CosineScheduler
+    std_annealing_scheduler_kwargs:
+      initial_value: [1.5, 1.5, 1.5]
+      min_value: [0.1, 0.1, 0.1]
+      T_interval: [1000, 1000, 1000]
     use_imagination: False
+
+    # imagination parameters
     num_imagination_envs: 4095  # TODO: why 4095?
     num_imagination_steps: 96
     command_resample_interval: -1
@@ -139,7 +148,7 @@ agent:
     # system dynamics (world model) training parameters
     learning_rate: 1e-3
     weight_decay: 0.0
-    forecast_horizon: 8
+    forecast_horizon: 16
     num_mini_batches: 20
     mini_batch_size: 5000
     loss_weights:  # TODO: maybe I should tune this later
@@ -218,7 +227,14 @@ agent:
     experiment_name: ""
     write_interval: auto
     checkpoint_interval: auto
-
+    wandb: True
+    wandb_kwargs:
+      project: "robot_lab_rwm"
+      group: "test"
+      entity: "sustech_jude"
+      tags: ["humanoid", "rwm", "mbpo"]
+      notes: "MBPO PPO with Robot World Model"
+      name: "test"
 
 # Sequential trainer
 # https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html

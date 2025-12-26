@@ -43,6 +43,10 @@ class ModelBasedVisEnv(ModelBasedRLEnv):
         super().__init__(cfg=cfg, render_mode=render_mode, **kwargs)
         self.env_ids_real = torch.arange(0, self.num_envs, 2, device=self.device)
         self.env_ids_imagination = torch.arange(1, self.num_envs, 2, device=self.device)
+        self.noise_scale = 0.0
+
+    def set_noise_scale(self, noise_scale):
+        self.noise_scale = noise_scale
 
     def init_imagination_history(self, history_horizon):
         self.imagination_state_history = torch.zeros(self.num_envs // 2, history_horizon, self.observation_manager.group_obs_dim["system_state"][0], device=self.device)
@@ -129,7 +133,10 @@ class ModelBasedVisEnv(ModelBasedRLEnv):
     def _update_imagination_envs(self, action):
         self.num_imagination_envs = len(self.env_ids_imagination)
         rollout_action = action[self.env_ids_imagination]
-        self.imagination_action_history = torch.cat([self.imagination_action_history[:, 1:].clone(), self.rwm_action_normalizer(rollout_action).unsqueeze(1)], dim=1)
+        self.imagination_action_history = torch.cat([
+            self.imagination_action_history[:, 1:].clone(), 
+            self.rwm_action_normalizer(rollout_action).unsqueeze(1) + self.noise_scale * torch.randn_like(rollout_action)
+        ], dim=1)
         if self.world_model.architecture_config["type"] in ["rnn", "rssm"]:
             self.imagination_state_history = self.imagination_state_history[:, -1].unsqueeze(1)
             self.imagination_action_history = self.imagination_action_history[:, -1].unsqueeze(1)
@@ -144,6 +151,7 @@ class ModelBasedVisEnv(ModelBasedRLEnv):
         true_system_termination = self.obs_buf['system_termination'][self.env_ids_real]
 
         imagination_states, *_ = self.world_model.compute(inputs)
+        imagination_states = imagination_states + self.noise_scale * torch.randn_like(imagination_states)
         imagination_states_denormalized = self.rwm_state_normalizer.inverse(imagination_states)
         parsed_imagination_states = self._parse_imagination_states(imagination_states_denormalized)
         self._reset_imagination_sim(parsed_imagination_states)

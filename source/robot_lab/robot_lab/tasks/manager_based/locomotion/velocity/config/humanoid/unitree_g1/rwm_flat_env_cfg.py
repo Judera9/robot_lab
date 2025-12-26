@@ -9,6 +9,7 @@ import math
 from isaaclab.utils import configclass
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 from isaaclab.envs.mdp.commands.velocity_command import UniformVelocityCommand
@@ -133,10 +134,7 @@ class SampleUniformVelocityCommand(UniformVelocityCommand):
             # set their visibility to true
             self.goal_vel_visualizer.set_visibility(True)
             self.current_vel_visualizer.set_visibility(True)
-            if hasattr(self._env, "env_ids_real"):
-                self.imagination_vel_visualizer.set_visibility(True)
-            else:
-                self.imagination_vel_visualizer.set_visibility(False)
+            self.imagination_vel_visualizer.set_visibility(True)
         else:
             if hasattr(self, "goal_vel_visualizer"):
                 self.goal_vel_visualizer.set_visibility(False)
@@ -145,6 +143,7 @@ class SampleUniformVelocityCommand(UniformVelocityCommand):
 
     def _debug_vis_callback(self, event):
         if not hasattr(self._env, "env_ids_real"):
+            self.imagination_vel_visualizer.set_visibility(False)
             super()._debug_vis_callback(event)
             return
         # check if robot is initialized
@@ -183,12 +182,34 @@ class RWMUnitreeG1FlatEnvCfg(UnitreeG1RoughEnvCfg):
         self.observations.system_state.joint_pos.params["asset_cfg"].joint_names = self.joint_names
         self.observations.system_state.joint_vel.params["asset_cfg"].joint_names = self.joint_names
 
+        # events modified
+        self.events.randomize_push_robot = EventTerm(
+            func=mdp.push_by_setting_velocity_mod,
+            mode="interval",
+            interval_range_s=(10.0, 15.0),
+            params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}},
+        )
+        self.events.randomize_apply_external_force_torque = EventTerm(
+        func=mdp.apply_external_force_torque_mod,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=""),
+                "force_range": (-10.0, 10.0),
+                "torque_range": (-10.0, 10.0),
+            },
+        )
+        self.events.randomize_apply_external_force_torque.params["asset_cfg"].body_names = [self.base_link_name]
+        # self.events.randomize_apply_external_force_torque.mode = "interval"
+        # self.events.randomize_apply_external_force_torque.interval_range_s = (2.0, 2.0)
+        # self.events.randomize_apply_external_force_torque.params['force_range'] = (15.0, 15.0)
+        # self.events.randomize_apply_external_force_torque.params['torque_range'] = (15.0, 15.0)
+
         # no terrain curriculum
         self.curriculum.terrain_levels = None
 
         # Terminations
-        self.terminations.bad_orientation = None
-        self.terminations.root_height_below_minimum = None
+        self.terminations.bad_orientation.params["limit_angle"] = 0.6
+        self.terminations.root_height_below_minimum.params["minimum_height"] = 0.1
 
         # Commands
         # override commands
@@ -232,11 +253,19 @@ class RWMUnitreeG1FlatEnvVisCfg(RWMUnitreeG1FlatEnvCfg):
         self.events.randomize_actuator_gains = None
         self.events.randomize_reset_base = None
         self.events.randomize_push_robot = None
+        # self.events.randomize_push_robot.interval_range_s = (2.0, 2.0)
+        # self.events.randomize_push_robot.params['velocity_range']['x'] = (-2.0, 2.0)
+        # self.events.randomize_push_robot.params['velocity_range']['y'] = (-2.0, 2.0)
         self.events.randomize_rigid_body_material = None
         self.events.randomize_rigid_body_mass_base = None
         self.events.randomize_rigid_body_mass_others = None
         self.events.randomize_com_positions = None
         self.events.randomize_apply_external_force_torque = None
+        # self.events.randomize_apply_external_force_torque.params["asset_cfg"].body_names = ['head_link']
+        # self.events.randomize_apply_external_force_torque.mode = "interval"
+        # self.events.randomize_apply_external_force_torque.interval_range_s = (2.0, 2.0)
+        # self.events.randomize_apply_external_force_torque.params['force_range'] = (10.0, 10.0)
+        # self.events.randomize_apply_external_force_torque.params['torque_range'] = (10.0, 10.0)
         self.events.randomize_reset_joints = None
          
         # If the weight of rewards is 0, set rewards to None
