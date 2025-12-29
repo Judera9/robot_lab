@@ -1,0 +1,244 @@
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+seed: 42
+
+
+# Models are instantiated using skrl's model instantiator utility
+# https://skrl.readthedocs.io/en/latest/api/utils/model_instantiators.html
+models:
+  separate: True
+
+  rwm_world_model:
+    class: SystemDynamicsEnsemble
+    ensemble_size: 1
+    history_horizon: 32
+    architecture_config:
+      type: rnn
+      rnn_type: gru
+      rnn_num_layers: 2
+      rnn_hidden_size: 320
+      state_mean_shape: [128]
+      state_logstd_shape: [128]
+      extension_shape: [128]
+      contact_shape: [128]
+      termination_shape: [128]
+    freeze_auxiliary: False
+
+  policy:  # see gaussian_model parameters
+    class: SimpleGaussian
+    init_noise_std: 1.0
+    actor_hidden_dims: [512, 256, 128]
+    activation: elu
+    noise_std_type: "log"
+    input_key: policy # + vel_est
+    share_std_backbone: False
+    use_scale_tril: False  # must use share_std_backbone?
+    # output_action_scale: False
+    max_log_std: 2.0
+    min_log_std: -20.0
+    max_action: 10.0
+    min_action: -10.0
+    # OrnsteinUhlenbeckNoise, PinkNoiseDist or None
+    # theta: control the decay speed of the noise: tune 0.5 ~ 0.7
+    # sigma: control the amplitude of the noise: tune 0.7 ~ 1.0
+    # base_scale: control the base scale of the noise: tune 1.0 ~ 2.0
+    # mean: control the mean of the noise: tune 0.0 ~ 1.0
+    # std: control the standard deviation of the noise: tune 1.0 ~ 2.0
+    noise_generator: None
+    noise_generator_kwargs: 
+      theta: 0.5
+      sigma: 0.7
+      base_scale: 1.0
+      mean: 0.0
+      std: 1.0
+
+  value:  # see deterministic_model parameters
+    class: SimpleDeterministic
+    hidden_dims: [512, 256, 128]
+    activation: elu
+
+
+# Rollout memory
+# https://skrl.readthedocs.io/en/latest/api/memories/random.html
+memory:
+  class: Memory
+  memory_size: -1  # automatically determined (same as agent:rollouts)
+
+# Replay buffer for Robot World Model (ETH)
+system_dynamics_reply_buffer:
+  class: ReplayBuffer
+  memory_size: 1000
+
+imagination_storage:
+  class: Memory
+  memory_size: 24  # imagination rollout
+
+# PPO agent configuration (field names are from PPO_DEFAULT_CONFIG)
+# https://skrl.readthedocs.io/en/latest/api/agents/ppo.html
+agent:
+  class: MBPO_PPO
+  rollouts: 24
+  learning_epochs: 5
+  mini_batches: 4
+  discount_factor: 0.99
+  lambda: 0.95
+  learning_rate: 1.0e-03
+  learning_rate_scheduler: KLAdaptiveLR
+  learning_rate_scheduler_kwargs:
+    kl_threshold: 0.01
+    min_lr: 1.0e-05
+    max_lr: 1.0e-02
+    kl_factor: 2.0
+    lr_factor: 1.5
+  use_encoder: False
+  # encoder_kwargs:
+  #   model_name: vel_encoder
+  #   obs_name: vel_est
+  #   learning_rate: 1.0e-03
+  #   encoder_preprocessor: RunningStandardScaler
+  #   encoder_preprocessor_kwargs: null
+  #   # encoder_type: concat
+  state_preprocessor: RunningStandardScaler
+  state_preprocessor_kwargs: null
+  actor_observation_preprocessor: RunningStandardScaler
+  actor_observation_preprocessor_kwargs: null
+  value_preprocessor: RunningStandardScaler
+  value_preprocessor_kwargs: null
+  random_timesteps: 0
+  learning_starts: 0
+  grad_norm_clip: 1.0
+  ratio_clip: 0.2
+  value_clip: 0.2
+  clip_predicted_values: True
+  entropy_loss_scale: 0.0045
+  entropy_scheduler: ConstantScheduler
+  entropy_scheduler_kwargs:
+    decay_factor: 0.95
+    decay_interval: 1000
+    min_value: 0.003
+  grad_penalty_weight: 0.0
+  value_loss_scale: 1.0
+  kl_threshold: 0.1
+  rewards_shaper_scale: 1.0
+  time_limit_bootstrap: True
+  world_model: SystemDynamicsEnsemble
+  world_model_kwargs:
+
+    # training settings
+    resume_world_model: False
+    train_world_model: True
+    resume_policy: True
+    train_policy: False
+    std_annealing_scheduler: CosineScheduler
+    std_annealing_scheduler_kwargs:
+      initial_value: [1.5, 1.5, 1.5]
+      min_value: [0.1, 0.1, 0.1]
+      T_interval: [1000, 1000, 1000]
+    use_imagination: False
+
+    # imagination parameters
+    num_imagination_envs: 4095  # TODO: why 4095?
+    num_imagination_steps: 96
+    command_resample_interval: -1
+    uncertainty_penalty_weight: -0.0
+
+    # system dynamics (world model) training parameters
+    learning_rate: 1e-3
+    weight_decay: 0.0
+    forecast_horizon: 16
+    num_mini_batches: 20
+    mini_batch_size: 5000
+    loss_weights:  # TODO: maybe I should tune this later
+      state: 1.0
+      sequence: 1.0
+      bound: 1.0
+      kl: 1.0
+      extension: 1.0
+      contact: 1.0
+      termination: 1.0
+
+    # evaluation parameters
+    eval_trajectories_num: 100
+    eval_trajectory_len: 400
+    eval_trajectory_noise_scale: [0.1, 0.2, 0.4, 0.5, 0.8]
+
+    # normalizer parameters
+    train_normalizer: True
+    stop_train_normalizer_iter: 5000
+    rwm_state_normalizer: EmpiricalNormalization
+    rwm_state_normalizer_kwargs: 
+      mean: [
+        0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0,
+        0.0, 0.0, -0.98,  
+        # joint pos
+        0.0, 0.0, 0.0, 0.2, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.2, 0.0, 0.0,
+        0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0,
+        # joint vel
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0,
+        ]
+      std: [
+        0.5, 0.5, 0.3,
+        1.0, 1.0, 2.0,
+        0.1, 0.1, 0.1,
+        # joint pos
+        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+        0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+        0.1,
+        0.1, 0.1, 0.1, 0.1, 0.1,
+        0.1, 0.1, 0.1, 0.1, 0.1,
+        # joint vel
+        2.5, 2.0, 3.0, 4.0, 3.0, 3.5,
+        2.5, 2.0, 3.0, 4.0, 3.0, 3.5,
+        4.0,
+        2.0, 2.0, 2.0, 2.0, 2.0,
+        2.0, 2.0, 2.0, 2.0, 2.0,
+        ]
+    rwm_action_normalizer: EmpiricalNormalization
+    rwm_action_normalizer_kwargs: 
+      mean: [
+        0.0, 0.3, -0.3, 0.5, 0.3, -0.3,
+        0.0, -0.3, 0.3, 0.5, 0.3, -0.3,
+        0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0
+        ]
+      std: [
+        1.0, 1.0, 1.0, 1.0, 2.0, 2.0,
+        1.0, 1.0, 1.0, 1.0, 2.0, 2.0,
+        1.0,
+        1.5, 1.5, 1.5, 1.5, 1.5,
+        1.5, 1.5, 1.5, 1.5, 1.5,
+        ]
+
+  # logging and checkpoint
+  experiment:
+    directory: "g1_flat_rwm"
+    experiment_name: ""
+    write_interval: auto
+    checkpoint_interval: auto
+    wandb: True
+    wandb_kwargs:
+      project: "robot_lab_rwm"
+      group: "exp on mini-batch / replay buffer size / rollout / hidden dims"
+      entity: "sustech_jude"
+      tags: ["humanoid", "rwm", "mbpo"]
+      notes: "MBPO PPO with Robot World Model"
+      name: "mini-batch size 5000, replay buffer size 1000, rollout 24, hidden dims 320"
+
+# Sequential trainer
+# https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html
+trainer:
+  class: MBPOTrainer
+  timesteps: 240000
+  environment_info: log

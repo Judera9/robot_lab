@@ -17,6 +17,13 @@ a more user-friendly way.
 
 import argparse
 import sys
+import os
+
+algorithm_skrl_path = '/workspace/isaaclab/skrl'
+sys.path.insert(0, algorithm_skrl_path)
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+os.environ["WANDB_API_KEY"] = "150f9097eafe94b5550495b764230904d8b9d7f3"
+os.environ["WANDB_MODE"] = "online"
 
 from isaaclab.app import AppLauncher
 

@@ -8,6 +8,10 @@ from __future__ import annotations
 import torch
 from typing import Any, Sequence
 
+import isaaclab
+import importlib.metadata
+from packaging import version
+issaclab_version = importlib.metadata.version('isaaclab')
 from isaaclab.envs.common import VecEnvStepReturn
 from isaaclab.envs.manager_based_rl_env import ManagerBasedRLEnv
 from isaaclab.managers import RewardManager
@@ -71,7 +75,8 @@ class CustomBasedRLEnv(ManagerBasedRLEnv):
             self.scene.write_data_to_sim()
             # simulate
             self.sim.step(render=False)
-            self.recorder_manager.record_post_physics_decimation_step()
+            if version.parse(issaclab_version) >= version.parse("2.3.0"):
+                self.recorder_manager.record_post_physics_decimation_step()
             # render between steps only if the GUI or an RTX sensor needs it
             # note: we assume the render interval to be the shortest accepted rendering interval.
             #    If a camera needs rendering at a faster frequency, this will lead to unexpected behavior.

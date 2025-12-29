@@ -196,3 +196,231 @@ def _randomize_prop_by_op(
             f"Unknown operation: '{operation}' for property randomization. Please use 'add', 'scale', or 'abs'."
         )
     return data
+
+"""From RWM, used for imagination visualization"""
+
+def reset_root_state_uniform_visualize(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    pose_range: dict[str, tuple[float, float]],
+    velocity_range: dict[str, tuple[float, float]],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    # intersect the reset envs with only the real envs
+    uniques, counts = torch.cat([env_ids, env.env_ids_real]).unique(return_counts=True)
+    env_ids = uniques[counts > 1]
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+    # get default root state
+    root_states = asset.data.default_root_state[env_ids].clone()
+
+    # poses
+    range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
+    ranges = torch.tensor(range_list, device=asset.device)
+    rand_samples = math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=asset.device)
+
+    positions = root_states[:, 0:3] + rand_samples[:, 0:3]
+    orientations = math_utils.quat_from_euler_xyz(rand_samples[:, 3], rand_samples[:, 4], rand_samples[:, 5])
+
+    # velocities
+    range_list = [velocity_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
+    ranges = torch.tensor(range_list, device=asset.device)
+    rand_samples = math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=asset.device)
+
+    velocities = root_states[:, 7:13] + rand_samples
+    
+    env_ids = torch.vstack([env_ids, env_ids + 1]).T.flatten()
+    positions = torch.repeat_interleave(positions, 2, dim=0) + env.scene.env_origins[env_ids]
+    orientations = torch.repeat_interleave(orientations, 2, dim=0)
+    velocities = torch.repeat_interleave(velocities, 2, dim=0)
+
+    # set into the physics simulation
+    asset.write_root_pose_to_sim(torch.cat([positions, orientations], dim=-1), env_ids=env_ids)
+    asset.write_root_velocity_to_sim(velocities, env_ids=env_ids)
+
+
+def reset_root_state_to_specified(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    positions: torch.Tensor,
+    orientations: torch.Tensor,
+    velocities: torch.Tensor,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+
+    # set into the physics simulation
+    asset.write_root_pose_to_sim(torch.cat([positions, orientations], dim=-1), env_ids=env_ids)
+    asset.write_root_velocity_to_sim(velocities, env_ids=env_ids)
+
+
+def reset_root_velocity_to_specified(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    velocities: torch.Tensor,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+
+    # set into the physics simulation
+    asset.write_root_velocity_to_sim(velocities, env_ids=env_ids)
+
+
+def reset_joints_by_scale_visualize(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    position_range: tuple[float, float],
+    velocity_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    # intersect the reset envs with only the real envs
+    uniques, counts = torch.cat([env_ids, env.env_ids_real]).unique(return_counts=True)
+    env_ids = uniques[counts > 1]
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    # get default joint state
+    joint_pos = asset.data.default_joint_pos[env_ids].clone()
+    joint_vel = asset.data.default_joint_vel[env_ids].clone()
+
+    # scale these values randomly
+    joint_pos *= math_utils.sample_uniform(*position_range, joint_pos.shape, joint_pos.device)
+    joint_vel *= math_utils.sample_uniform(*velocity_range, joint_vel.shape, joint_vel.device)
+
+    # clamp joint pos to limits
+    joint_pos_limits = asset.data.soft_joint_pos_limits[env_ids]
+    joint_pos = joint_pos.clamp_(joint_pos_limits[..., 0], joint_pos_limits[..., 1])
+    # clamp joint vel to limits
+    joint_vel_limits = asset.data.soft_joint_vel_limits[env_ids]
+    joint_vel = joint_vel.clamp_(-joint_vel_limits, joint_vel_limits)
+    
+    env_ids = torch.vstack([env_ids, env_ids + 1]).T.flatten()
+    joint_pos = torch.repeat_interleave(joint_pos, 2, dim=0)
+    joint_vel = torch.repeat_interleave(joint_vel, 2, dim=0)
+    
+    # set into the physics simulation
+    asset.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
+
+
+def reset_joints_to_specified(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    joint_pos: torch.Tensor,
+    joint_vel: torch.Tensor,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    # extract the used quantities (to enable type-hinting)
+    asset_cfg.resolve(env.scene)
+    asset: Articulation = env.scene[asset_cfg.name]
+    # clamp joint pos to limits
+    joint_pos_limits = asset.data.soft_joint_pos_limits[env_ids][:, asset_cfg.joint_ids]
+    joint_pos = joint_pos.clamp_(joint_pos_limits[..., 0], joint_pos_limits[..., 1])
+
+    # set into the physics simulation
+    asset.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids, joint_ids=asset_cfg.joint_ids)
+    # asset.write_joint_position_to_sim(joint_pos, env_ids=env_ids, joint_ids=asset_cfg.joint_ids)
+
+
+def reset_joints_by_offset_visualize(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    position_range: tuple[float, float],
+    velocity_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    # intersect the reset envs with only the real envs
+    uniques, counts = torch.cat([env_ids, env.env_ids_real]).unique(return_counts=True)
+    env_ids = uniques[counts > 1]
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+
+    # get default joint state
+    joint_pos = asset.data.default_joint_pos[env_ids].clone()
+    joint_vel = asset.data.default_joint_vel[env_ids].clone()
+
+    # bias these values randomly
+    joint_pos += math_utils.sample_uniform(*position_range, joint_pos.shape, joint_pos.device)
+    joint_vel += math_utils.sample_uniform(*velocity_range, joint_vel.shape, joint_vel.device)
+
+    # clamp joint pos to limits
+    joint_pos_limits = asset.data.soft_joint_pos_limits[env_ids]
+    joint_pos = joint_pos.clamp_(joint_pos_limits[..., 0], joint_pos_limits[..., 1])
+    # clamp joint vel to limits
+    joint_vel_limits = asset.data.soft_joint_vel_limits[env_ids]
+    joint_vel = joint_vel.clamp_(-joint_vel_limits, joint_vel_limits)
+
+    env_ids = torch.vstack([env_ids, env_ids + 1]).T.flatten()
+    joint_pos = torch.repeat_interleave(joint_pos, 2, dim=0)
+    joint_vel = torch.repeat_interleave(joint_vel, 2, dim=0)
+
+    # set into the physics simulation
+    asset.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
+
+""" For RWM, set the same DR for evaluate world model"""
+
+def push_by_setting_velocity_mod(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    velocity_range: dict[str, tuple[float, float]],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    """Push the asset by setting the root velocity to a random value within the given ranges.
+
+    This creates an effect similar to pushing the asset with a random impulse that changes the asset's velocity.
+    It samples the root velocity from the given ranges and sets the velocity into the physics simulation.
+
+    The function takes a dictionary of velocity ranges for each axis and rotation. The keys of the dictionary
+    are ``x``, ``y``, ``z``, ``roll``, ``pitch``, and ``yaw``. The values are tuples of the form ``(min, max)``.
+    If the dictionary does not contain a key, the velocity is set to zero for that axis.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+
+    # velocities
+    vel_w = asset.data.root_vel_w[env_ids]
+    # sample random velocities
+    range_list = [velocity_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
+    ranges = torch.tensor(range_list, device=asset.device)
+    vel_w += math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], vel_w.shape, device=asset.device)
+
+    if hasattr(env, "env_ids_real"):
+        vel_w[1:, ...] = vel_w[0, ...].expand(len(env_ids) - 1, -1)
+    
+    # set the velocities into the physics simulation
+    asset.write_root_velocity_to_sim(vel_w, env_ids=env_ids)
+
+def apply_external_force_torque_mod(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor,
+    force_range: tuple[float, float],
+    torque_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+):
+    """Randomize the external forces and torques applied to the bodies.
+
+    This function creates a set of random forces and torques sampled from the given ranges. The number of forces
+    and torques is equal to the number of bodies times the number of environments. The forces and torques are
+    applied to the bodies by calling ``asset.set_external_force_and_torque``. The forces and torques are only
+    applied when ``asset.write_data_to_sim()`` is called in the environment.
+    """
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObject | Articulation = env.scene[asset_cfg.name]
+    # resolve environment ids
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device=asset.device)
+    # resolve number of bodies
+    num_bodies = len(asset_cfg.body_ids) if isinstance(asset_cfg.body_ids, list) else asset.num_bodies
+
+    # sample random forces and torques
+    size = (len(env_ids), num_bodies, 3)
+    forces = math_utils.sample_uniform(*force_range, size, asset.device)
+    torques = math_utils.sample_uniform(*torque_range, size, asset.device)
+
+    if hasattr(env, "env_ids_real"):
+        forces[1:, ...] = forces[0, ...].expand(len(env_ids) - 1, num_bodies, 3)
+        torques[1:, ...] = torques[0, ...].expand(len(env_ids) - 1, num_bodies, 3)
+
+    # set the forces and torques into the buffers
+    # note: these are only applied when you call: `asset.write_data_to_sim()`
+    asset.set_external_force_and_torque(forces, torques, env_ids=env_ids, body_ids=asset_cfg.body_ids)
